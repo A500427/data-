@@ -199,7 +199,7 @@ if uploaded_file is not None:
     st.subheader("📈 Jaaroverzicht: totaal geladen energie per jaar")
     energy_by_year = df_filtered.groupby("year")["energy_delivered [kwh]"].sum().reset_index().sort_values("year")
 
-    chart_type_year = st.radio("Kies grafiektype jaar:", ["Staafdiagram","Lijndiagram"], key="jaar", horizontal=True)
+    chart_type_year = st.radio("Kies grafiektype jaar:", ["Staafdiagram","Lijndiagram"], key="jaar_grafiek", horizontal=True)
     if chart_type_year=="Staafdiagram":
         fig3 = px.bar(energy_by_year, x="year", y="energy_delivered [kwh]",
                       title="Totaal geladen energie per jaar")
@@ -302,6 +302,7 @@ if uploaded_file is not None:
 
 else:
     st.warning("Upload eerst een CSV bestand om te starten.")
+
 
 
 
