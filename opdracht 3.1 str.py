@@ -37,14 +37,6 @@ print(df6.head(20))
 
 # %%
 import pickle
-with open("cars.pkl", "rb") as f:
-    data = pickle.load(f)
-print(type(data))
-data.head(20)
-
-
-# %%
-import pickle
 with open("Charging_data.pkl", "rb") as f:
     data_1 = pickle.load(f)
 print(type(data_1))
@@ -129,39 +121,6 @@ print(df5.isna().sum())
 # %%
 print(df6.isna().sum())
 
-
-# %%
-import pickle
-import pandas as pd
-
-# --- Stap 1: Pickle-bestand openen ---
-with open("cars.pkl", "rb") as f:
-    data = pickle.load(f)
-
-# --- Stap 2: Check het type en de eerste paar elementen ---
-print("Type van data:", type(data))
-print("Eerste 5 items:", data[:5])
-
-# --- Stap 3: Omzetten naar DataFrame ---
-# Optie A: lijst van dictionaries
-try:
-    df = pd.DataFrame(data)
-except Exception as e:
-    print("Fout bij omzetting:", e)
-    # Optie B: lijst van lijsten — pas kolomnamen aan naar jouw data
-    df = pd.DataFrame(data, columns=['kolom1','kolom2','kolom3'])  # pas aan
-
-# --- Stap 4: Eerste 20 rijen bekijken ---
-print("Eerste 20 rijen:")
-print(df.head(20))
-
-# --- Stap 5: Missende waarden bekijken ---
-print("Aantal missende waarden per kolom:")
-print(df.isna().sum())
-
-# --- Optioneel: percentage missende waarden ---
-print("Percentage missende waarden per kolom:")
-print((df.isna().mean() * 100).round(2))
 
 
 # %%
@@ -345,6 +304,7 @@ if uploaded_file is not None:
 
 else:
     st.warning("Upload eerst een CSV bestand om te starten.")
+
 
 
 
