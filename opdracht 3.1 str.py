@@ -121,8 +121,7 @@ print(df5.isna().sum())
 # %%
 print(df6.isna().sum())
 
-
-# %% EV Laad Analyse Dashboard (PKL of CSV) – NaT-safe versie
+# %% EV Laad Analyse Dashboard (PKL of CSV) – NaT-safe, hele jaren, bestand onthouden
 import streamlit as st
 import pandas as pd
 import plotly.express as px
@@ -133,12 +132,23 @@ st.write("Analyseer laadsessies per uur en bekijk jaaroverzicht van totale gelad
 # ---- BESTANDSTYPE KEUZE ----
 file_type = st.radio("Kies bestandstype:", ["Pickle (.pkl)", "CSV (.csv)"], index=0)
 
-uploaded_file = None
-if file_type == "Pickle (.pkl)":
-    uploaded_file = st.file_uploader("Upload Charging_data.pkl", type=["pkl", "pickle"])
-elif file_type == "CSV (.csv)":
-    uploaded_file = st.file_uploader("Upload je CSV bestand", type=["csv"])
+# ---- Bestand onthouden in session_state ----
+if "uploaded_file" not in st.session_state:
+    st.session_state.uploaded_file = None
 
+uploaded_file = st.session_state.uploaded_file
+
+# Alleen updaten als er een nieuw bestand wordt geüpload
+if file_type == "Pickle (.pkl)":
+    new_file = st.file_uploader("Upload Charging_data.pkl", type=["pkl", "pickle"])
+elif file_type == "CSV (.csv)":
+    new_file = st.file_uploader("Upload je CSV bestand", type=["csv"])
+
+if new_file is not None:
+    st.session_state.uploaded_file = new_file
+    uploaded_file = new_file
+
+# ---- DATA VERWERKING EN GRAFIEKEN ----
 if uploaded_file is not None:
     # ---- DATA INLADEN ----
     if file_type == "Pickle (.pkl)":
@@ -159,12 +169,12 @@ if uploaded_file is not None:
         df["month"] = df["start_time"].dt.to_period("M").astype(str)
         df["year"] = df["start_time"].dt.year
 
-        # Verwijder rijen zonder datum en converteer naar int
+        # Verwijder rijen zonder datum en zet year als int
         df = df[df["year"].notna()]
         df["year"] = df["year"].astype(int)
 
-        # Filters
-        phase_options = ["Alle"] + sorted(df["n_phases"].dropna().unique().tolist())
+        # Filters: n_phases beperkt tot 0-6
+        phase_options = ["Alle"] + [x for x in sorted(df["n_phases"].dropna().unique()) if 0 <= x <= 6]
         phase_choice = st.sidebar.selectbox("Filter op aantal fasen (N_phases)", phase_options)
 
         year_options = ["Alle"] + sorted(df["year"].dropna().unique().tolist())
@@ -191,7 +201,7 @@ if uploaded_file is not None:
         df["month"] = df["started"].dt.to_period("M").astype(str)
         df["year"] = df["started"].dt.year
 
-        # Verwijder rijen zonder datum en converteer naar int
+        # Verwijder rijen zonder datum en zet year als int
         df = df[df["year"].notna()]
         df["year"] = df["year"].astype(int)
 
@@ -223,11 +233,17 @@ if uploaded_file is not None:
                   title="Totaal geladen energie per maand")
     st.plotly_chart(fig2, use_container_width=True)
 
-    # ---- GRAFIEK 3: Totaal geladen energie per jaar ----
+    # ---- GRAFIEK 3: Totaal geladen energie per jaar (hele jaren) ----
     st.subheader("📈 Totaal geladen energie per jaar")
     energy_by_year = df_filtered.groupby("year")[energy_col].sum().reset_index().sort_values("year")
-    fig3 = px.bar(energy_by_year, x="year", y=energy_col,
-                  title="Totaal geladen energie per jaar")
+    energy_by_year["year"] = energy_by_year["year"].astype(int)
+    fig3 = px.bar(
+        energy_by_year,
+        x=energy_by_year["year"].astype(str),  # categorische hele jaren
+        y=energy_col,
+        title="Totaal geladen energie per jaar"
+    )
+    fig3.update_xaxes(title="Jaar")
     st.plotly_chart(fig3, use_container_width=True)
 
     # ---- EXTRA GRAFIEK (CSV) ----
@@ -249,6 +265,8 @@ if uploaded_file is not None:
 
 else:
     st.warning(f"Upload eerst een {file_type} bestand om te starten.")
+
+
 
 
 
