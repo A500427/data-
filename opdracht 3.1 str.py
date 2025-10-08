@@ -132,9 +132,7 @@ uploaded_file = st.sidebar.file_uploader("Charging_data.pkl", type=["pkl", "pick
 if uploaded_file is not None:
     # Lees het pickle-bestand
     df = pd.read_pickle('Charging_data.pkl')
-else:
-    st.warning(" Charging_data.pkl")
-    st.stop()
+
 
 
 
@@ -304,6 +302,7 @@ if uploaded_file is not None:
 
 else:
     st.warning("Upload eerst een CSV bestand om te starten.")
+
 
 
 
