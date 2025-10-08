@@ -241,7 +241,7 @@ if uploaded_file is not None:
         # ---- GRAFIEK 3: Totaal geladen energie per jaar (hele jaren) ----
         st.subheader("📈 Totaal geladen energie per jaar")
         energy_by_year = df_filtered.groupby("year")[energy_col].sum().reset_index().sort_values("year")
-        energy_by_year["year"] = energy_by_year["year"].astype(int)
+        energy_by_year["year"] = energy_by_year["year"].astype(str)
         fig3 = px.bar(
             energy_by_year,
             x=energy_by_year["year"].astype(str),  # categorische hele jaren
@@ -273,6 +273,7 @@ if uploaded_file is not None:
 
 else:
     st.warning(f"Upload eerst een {file_type} bestand om te starten.")
+
 
 
 
