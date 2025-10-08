@@ -262,7 +262,7 @@ if uploaded_file is not None:
     # ---- GRAFIEK 2: Totaal geladen energie per maand ----
     st.subheader("📅 Totaal geladen energie per maand")
     energy_by_month = df_filtered.groupby("month")["totalenergy"].sum().reset_index().sort_values("month")
-    chart_type_month = st.radio("Kies grafiektype maand:", ["Staafdiagram","Lijndiagram"], key="maand", horizontal=True)
+    chart_type_month = st.radio("Kies grafiektype maand:", ["Staafdiagram","Lijndiagram"], key="maand_grafiek", horizontal=True)
     if chart_type_month=="Staafdiagram":
         fig2 = px.bar(energy_by_month, x="month", y="totalenergy",
                       title="Totaal geladen energie per maand")
@@ -302,6 +302,7 @@ if uploaded_file is not None:
 
 else:
     st.warning("Upload eerst een CSV bestand om te starten.")
+
 
 
 
