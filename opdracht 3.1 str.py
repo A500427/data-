@@ -122,7 +122,7 @@ print(df5.isna().sum())
 print(df6.isna().sum())
 
 
-
+import streamlit as st
 # %%
 # ---- DATA INLADEN ----
 st.sidebar.header(" Data inladen")
@@ -304,6 +304,7 @@ if uploaded_file is not None:
 
 else:
     st.warning("Upload eerst een CSV bestand om te starten.")
+
 
 
 
