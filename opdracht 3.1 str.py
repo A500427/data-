@@ -122,29 +122,18 @@ print(df5.isna().sum())
 print(df6.isna().sum())
 
 
-import streamlit as st
-# %%
-# ---- DATA INLADEN ----
-st.sidebar.header(" Data inladen")
-
-uploaded_file = st.sidebar.file_uploader("Charging_data.pkl", type=["pkl", "pickle"])
-
-if uploaded_file is not None:
-    # Lees het pickle-bestand
-    df = pd.read_pickle('Charging_data.pkl')
-
-
-# %% EV Laad Analyse Dashboard (PKL of CSV)
+# %% EV Laad Analyse Dashboard (PKL of CSV) – NaT-safe versie
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 
-st.title("EV Laad Analyse Dashboard")
+st.title("🔌 EV Laad Analyse Dashboard")
 st.write("Analyseer laadsessies per uur en bekijk jaaroverzicht van totale geladen energie.")
 
 # ---- BESTANDSTYPE KEUZE ----
 file_type = st.radio("Kies bestandstype:", ["Pickle (.pkl)", "CSV (.csv)"], index=0)
 
+uploaded_file = None
 if file_type == "Pickle (.pkl)":
     uploaded_file = st.file_uploader("Upload Charging_data.pkl", type=["pkl", "pickle"])
 elif file_type == "CSV (.csv)":
@@ -168,7 +157,11 @@ if uploaded_file is not None:
         df["exit_time"] = pd.to_datetime(df["exit_time"], errors="coerce")
         df["hour"] = df["start_time"].dt.hour
         df["month"] = df["start_time"].dt.to_period("M").astype(str)
-        df["year"] = df["start_time"].dt.year.astype(int)
+        df["year"] = df["start_time"].dt.year
+
+        # Verwijder rijen zonder datum en converteer naar int
+        df = df[df["year"].notna()]
+        df["year"] = df["year"].astype(int)
 
         # Filters
         phase_options = ["Alle"] + sorted(df["n_phases"].dropna().unique().tolist())
@@ -183,7 +176,6 @@ if uploaded_file is not None:
         if year_choice != "Alle":
             df_filtered = df_filtered[df_filtered["year"] == year_choice]
 
-        # Kolom voor energie
         energy_col = "energy_delivered [kwh]"
 
     else:  # CSV
@@ -197,13 +189,17 @@ if uploaded_file is not None:
         df["ended"] = pd.to_datetime(df["ended"], errors="coerce")
         df["hour"] = df["started"].dt.hour
         df["month"] = df["started"].dt.to_period("M").astype(str)
-        df["year"] = df["started"].dt.year.astype(int)
+        df["year"] = df["started"].dt.year
+
+        # Verwijder rijen zonder datum en converteer naar int
+        df = df[df["year"].notna()]
+        df["year"] = df["year"].astype(int)
 
         # Gemiddelde laadsnelheid
         df["charge_rate"] = df["totalenergy"] / df["connectedtime"]
 
         # Filters
-        st.sidebar.header("Filters")
+        st.sidebar.header("⚙️ Filters")
         year_options = ["Alle"] + sorted(df["year"].dropna().unique().tolist())
         year_choice = st.sidebar.selectbox("Filter op jaar", year_options)
 
@@ -211,25 +207,24 @@ if uploaded_file is not None:
         if year_choice != "Alle":
             df_filtered = df_filtered[df_filtered["year"] == year_choice]
 
-        # Kolom voor energie
         energy_col = "totalenergy"
 
     # ---- GRAFIEK 1: Laadsessies per uur ----
-    st.subheader("Laadsessies per uur van de dag")
+    st.subheader("⏰ Laadsessies per uur van de dag")
     hourly_counts = df_filtered.groupby("hour").size().reset_index(name="Aantal laadsessies")
     fig1 = px.bar(hourly_counts, x="hour", y="Aantal laadsessies",
                   title="Aantal laadsessies per uur van de dag")
     st.plotly_chart(fig1, use_container_width=True)
 
     # ---- GRAFIEK 2: Totaal geladen energie per maand ----
-    st.subheader("Totaal geladen energie per maand")
+    st.subheader("📅 Totaal geladen energie per maand")
     energy_by_month = df_filtered.groupby("month")[energy_col].sum().reset_index().sort_values("month")
     fig2 = px.bar(energy_by_month, x="month", y=energy_col,
                   title="Totaal geladen energie per maand")
     st.plotly_chart(fig2, use_container_width=True)
 
     # ---- GRAFIEK 3: Totaal geladen energie per jaar ----
-    st.subheader("Totaal geladen energie per jaar")
+    st.subheader("📈 Totaal geladen energie per jaar")
     energy_by_year = df_filtered.groupby("year")[energy_col].sum().reset_index().sort_values("year")
     fig3 = px.bar(energy_by_year, x="year", y=energy_col,
                   title="Totaal geladen energie per jaar")
@@ -237,23 +232,24 @@ if uploaded_file is not None:
 
     # ---- EXTRA GRAFIEK (CSV) ----
     if file_type == "CSV (.csv)":
-        st.subheader("Gemiddelde laadsnelheid per sessie (kWh/uur)")
+        st.subheader("⚡ Gemiddelde laadsnelheid per sessie (kWh/uur)")
         fig4 = px.histogram(df_filtered, x="charge_rate", nbins=20,
                             title="Verdeling van gemiddelde laadsnelheid per sessie")
         st.plotly_chart(fig4, use_container_width=True)
 
-        st.subheader("Top 3 laaduren van de dag")
+        st.subheader("🚦 Top 3 laaduren van de dag")
         top_hours = df_filtered.groupby("hour").size().sort_values(ascending=False).head(3).reset_index(name="Aantal sessies")
         fig5 = px.bar(top_hours, x="hour", y="Aantal sessies",
                       title="Top 3 meest gebruikte laaduren")
         st.plotly_chart(fig5, use_container_width=True)
 
     # ---- Bekijk gefilterde data ----
-    with st.expander("Bekijk gebruikte data"):
+    with st.expander("📊 Bekijk gebruikte data"):
         st.dataframe(df_filtered)
 
 else:
     st.warning(f"Upload eerst een {file_type} bestand om te starten.")
+
 
 
 
