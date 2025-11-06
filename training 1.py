@@ -278,28 +278,18 @@ elif page == "🚘 Voertuigen":
     def bepaal_type(merk, uitvoering):
         u = str(uitvoering).upper()
         m = str(merk).upper()
-
         elektrische_prefixen = [
             "FA1FA1CZ", "3EER", "3EDF", "3EDE", "2EER", "2EDF", "2EDE",
             "E11", "0AW5", "QE2QE2G1", "QE1QE1G1", "HE1HE1G1", "FA1FA1MD"
         ]
-
-        # Elektrisch
-        if ("BMW I" in m or "PORSCHE" in m or
-            any(u.startswith(pref) for pref in elektrische_prefixen) or "EV" in u):
+        if "BMW I" in m or "PORSCHE" in m or any(u.startswith(pref) for pref in elektrische_prefixen) or "EV" in u:
             return "Elektrisch"
-
-        # Diesel
         if "DIESEL" in u or "TDI" in u or "CDI" in u or "DPE" in u or u.startswith("D"):
             return "Diesel"
-
-        # Benzine (default)
         return "Benzine"
 
     # --- Data inladen ---
-    data = df_auto.copy()
-
-    # --- Merknamen normaliseren ---
+    data = pd.read_csv("duitse_automerken_JA.csv")
     merk_mapping = {
         "VW": "VOLKSWAGEN",
         "FAW-VOLKSWAGEN": "VOLKSWAGEN",
@@ -308,8 +298,6 @@ elif page == "🚘 Voertuigen":
         "FORD-CNG-TECHNIK": "FORD"
     }
     data["Merk"] = data["Merk"].str.upper().replace(merk_mapping)
-
-    # --- Type bepalen ---
     data["Type"] = data.apply(lambda row: bepaal_type(row["Merk"], row["Uitvoering"]), axis=1)
 
     # --- Datumverwerking ---
@@ -330,172 +318,134 @@ elif page == "🚘 Voertuigen":
         options=alle_merknamen,
         default=[]
     )
-
     if not geselecteerde_merknamen:
         st.warning("⚠️ Geen merken geselecteerd. Alle merken worden getoond!")
         geselecteerde_merknamen = alle_merknamen
-
-    # --- Filter data op geselecteerde merken ---
     data = data[data["Merk"].isin(geselecteerde_merknamen)]
 
     # --- Aggregatie ---
     maand_aantal = data.groupby(["Maand", "Type"]).size().unstack(fill_value=0)
     cumulatief = maand_aantal.cumsum()
+    cumulatief_nonzero = cumulatief[cumulatief.sum(axis=1) > 0]
+    x_labels = [d.strftime("%b %Y") for d in cumulatief_nonzero.index]
 
-    # ===========================================
-    # 📈 Cumulatief aantal voertuigen per maand per brandstofcategorie
-    # ===========================================
-    st.subheader("📈 Cumulatief aantal voertuigen per maand per brandstofcategorie")
-
-    fig = px.line(
-        cumulatief.reset_index().melt(
-            id_vars="Maand",
-            var_name="Brandstofcategorie",
-            value_name="Aantal voertuigen"
+    # --- Grafiek 1: Cumulatief aantal voertuigen per maand ---
+    st.subheader("Cumulatief aantal voertuigen per maand")
+    fig1 = go.Figure()
+    for col in cumulatief_nonzero.columns:
+        fig1.add_trace(go.Scatter(
+            x=cumulatief_nonzero.index,
+            y=cumulatief_nonzero[col],
+            mode="lines+markers",
+            name=col
+        ))
+    fig1.update_layout(
+        title="Cumulatief aantal voertuigen per maand per brandstofcategorie",
+        xaxis_title="Maand",
+        yaxis_title="Aantal voertuigen (cumulatief)",
+        xaxis=dict(
+            tickmode="array",
+            tickvals=cumulatief_nonzero.index,
+            ticktext=x_labels
         ),
-        x="Maand",
-        y="Aantal voertuigen",
-        color="Brandstofcategorie",
-        title="Cumulatief aantal geregistreerde voertuigen per maand",
-        labels={
-            "Maand": "Maand van eerste toelating",
-            "Aantal voertuigen": "Aantal voertuigen (cumulatief)",
-            "Brandstofcategorie": "Brandstofcategorie"
-        },
-    )
-
-    # Verbeter visuele presentatie
-    fig.update_traces(
-        mode="lines+markers",
-        line=dict(width=2),
-        marker=dict(size=6),
-        hovertemplate="%{x|%b %Y}<br><b>%{y:,.0f}</b> voertuigen"
-    )
-
-    fig.update_layout(
-        xaxis_title="Datum (per maand)",
-        yaxis_title="Cumulatief aantal voertuigen",
-        legend_title="Brandstofcategorie",
         hovermode="x unified",
-        template="plotly_white",
-        height=500,
-        margin=dict(l=40, r=40, t=60, b=40),
+        height=500
     )
+    st.plotly_chart(fig1, use_container_width=True)
 
-    fig.update_xaxes(dtick="M1", tickformat="%b\n%Y")
-
-    st.plotly_chart(fig, use_container_width=True)
-
-       #-------------Grafiek Ann---------
-
-
-    # ---- Bestand vast instellen ----
+    # --- Bestand voor EV sessies ---
     file_path = "Charging_data.pkl"
 
-    # ---- FUNCTIE: x-as als hele getallen zetten ----
-    def force_integer_xaxis(fig):
-        fig.update_xaxes(dtick=1)
-        return fig
-
-    # ---- DATA INLADEN ----
     try:
         ev_data = pd.read_pickle(file_path)
-        ev_data.columns = (
-            ev_data.columns.astype(str)
-            .str.strip()
-            .str.replace("\u200b", "", regex=False)
-            .str.lower()
-        )
-
-        # ---- DATUMCONVERSIE EN KOLOMMEN TOEVOEGEN ----
+        ev_data.columns = ev_data.columns.str.strip().str.replace("\u200b", "", regex=False).str.lower()
         ev_data["start_time"] = pd.to_datetime(ev_data["start_time"], errors="coerce")
         ev_data["exit_time"] = pd.to_datetime(ev_data["exit_time"], errors="coerce")
         ev_data["hour"] = ev_data["start_time"].dt.hour
-        ev_data["month"] = ev_data["start_time"].dt.to_period("M").astype(str)
-        ev_data["year"] = ev_data["start_time"].dt.year
-        ev_data = ev_data[ev_data["year"].notna()]
-        ev_data["year"] = ev_data["year"].astype(int)
+        ev_data["month"] = ev_data["start_time"].dt.to_period("M").dt.to_timestamp()
         ev_data["weekday"] = ev_data["start_time"].dt.day_name()
-
         energy_col = "energy_delivered [kwh]"
 
-        # ---- WEEKDAGFILTER ----
+        # --- Filter weekdagen ---
         st.subheader("🔍 Filter op weekdagen")
         weekdays_order = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
         selected_days = st.multiselect(
-            "Selecteer één of meerdere weekdagen:",
+            "Selecteer weekdagen:",
             weekdays_order,
-            default=weekdays_order,
+            default=weekdays_order
         )
         ev_data = ev_data[ev_data["weekday"].isin(selected_days)]
 
-        # ---- HEATMAP: Laadpatronen per dag en uur ----
+        # --- Heatmap: Laadpatronen per dag en uur ---
         st.subheader("Laadpatronen per dag en uur")
         heatmap_data = ev_data.groupby(["weekday", "hour"]).size().reset_index(name="count")
         heatmap_data["weekday"] = pd.Categorical(heatmap_data["weekday"], categories=weekdays_order, ordered=True)
-
         fig_hm = px.density_heatmap(
-            heatmap_data,
-            x="hour",
-            y="weekday",
-            z="count",
-            color_continuous_scale=[[0.0, "#317595"], [0.5, "#fcffbf"], [1.0, "#c2242f"]],
+            heatmap_data, x="hour", y="weekday", z="count",
+            color_continuous_scale=[[0.0, "#317595"], [0.5, "#fcffbf"], [1.0, "#c2242f"]]
         )
-        fig_hm = force_integer_xaxis(fig_hm)
         fig_hm.update_coloraxes(colorbar_title="Aantal sessies", colorbar_title_side="top")
         st.plotly_chart(fig_hm, use_container_width=True)
 
-        # ---- FILTER OP AANTAL FASEN ----
+        # --- Filter op aantal fasen ---
         phase_options = ["Alle"] + [x for x in sorted(ev_data["n_phases"].dropna().unique()) if 0 <= x <= 6]
         phase_choice = st.selectbox("**Filter op aantal fasen**", phase_options)
-
         ev_filtered = ev_data.copy()
         if phase_choice != "Alle":
             ev_filtered = ev_filtered[ev_filtered["n_phases"] == phase_choice]
 
-        # ---- GRAFIEK 1: Laadsessies per uur van de dag ----
+        # --- Laadsessies per uur ---
         st.subheader("Laadsessies per uur van de dag")
         hourly_counts = ev_filtered.groupby("hour").size().reset_index(name="Aantal laadsessies")
-        fig1 = px.bar(hourly_counts, x="hour", y="Aantal laadsessies")
-        fig1 = force_integer_xaxis(fig1)
-        st.plotly_chart(fig1, use_container_width=True)
-
-        # ---- GRAFIEK 2: Totaal geladen energie per maand ----
-        st.subheader("Totaal geladen energie per maand")
-        energy_by_month = ev_filtered.groupby("month")[energy_col].sum().reset_index().sort_values("month")
-
-        # Controleer aantal unieke maanden
-        unique_months = energy_by_month["month"].nunique()
-
-        fig2 = px.bar(energy_by_month, x="month", y=energy_col)
-        fig2.update_xaxes(type="category", title_text="Maand")
-        fig2.update_yaxes(title_text="Totaal geladen energie (kWh)")
+        fig2 = px.bar(hourly_counts, x="hour", y="Aantal laadsessies")
+        fig2.update_xaxes(dtick=1)
         st.plotly_chart(fig2, use_container_width=True)
 
-        # ---- GRAFIEK 3: Gemiddelde sessieduur per maand ----
-        st.subheader("Gemiddelde sessieduur per maand (uren)")
-        ev_filtered["session_duration"] = (ev_filtered["exit_time"] - ev_filtered["start_time"]).dt.total_seconds() / 3600
-        avg_duration = (
-            ev_filtered.groupby("month")["session_duration"].mean().reset_index().sort_values("month")
+        # --- Totaal geladen energie per maand ---
+        st.subheader("Totaal geladen energie per maand")
+        energy_by_month = ev_filtered.groupby("month")[energy_col].sum().reset_index()
+        energy_by_month = energy_by_month[energy_by_month[energy_col] > 0]  # alleen maanden met data
+        energy_by_month["month_label"] = energy_by_month["month"].dt.strftime("%b %Y")
+        fig3 = px.bar(energy_by_month, x="month", y=energy_col)
+        fig3.update_xaxes(
+            tickmode="array",
+            tickvals=energy_by_month["month"],
+            ticktext=energy_by_month["month_label"]
         )
-        fig3 = px.line(avg_duration, x="month", y="session_duration", markers=True)
-        fig3.update_xaxes(type="category", title_text="Maand")
-        fig3.update_yaxes(title_text="Gemiddelde sessieduur (uren)")
+        fig3.update_yaxes(title_text="Totaal geladen energie (kWh)")
         st.plotly_chart(fig3, use_container_width=True)
 
-        # ---- GRAFIEK 4: Boxplot energie per sessie per maand ----
-        st.subheader("Verdeling van geladen energie per sessie per maand")
-        fig4 = px.box(ev_filtered, x="month", y=energy_col, points="all")
-        fig4.update_xaxes(type="category", title_text="Maand")
-        fig4.update_yaxes(title_text="Energie per sessie (kWh)")
+        # --- Gemiddelde sessieduur per maand ---
+        st.subheader("Gemiddelde sessieduur per maand (uren)")
+        ev_filtered["session_duration"] = (ev_filtered["exit_time"] - ev_filtered["start_time"]).dt.total_seconds() / 3600
+        avg_duration = ev_filtered.groupby("month")["session_duration"].mean().reset_index()
+        avg_duration = avg_duration[avg_duration["session_duration"] > 0]
+        avg_duration["month_label"] = avg_duration["month"].dt.strftime("%b %Y")
+        fig4 = px.line(avg_duration, x="month", y="session_duration", markers=True)
+        fig4.update_xaxes(
+            tickmode="array",
+            tickvals=avg_duration["month"],
+            ticktext=avg_duration["month_label"]
+        )
+        fig4.update_yaxes(title_text="Gemiddelde sessieduur (uren)")
         st.plotly_chart(fig4, use_container_width=True)
 
-        # ---- DATA BEKIJKEN ----
+        # --- Boxplot energie per sessie ---
+        st.subheader("Verdeling van geladen energie per sessie per maand")
+        ev_filtered_nonzero = ev_filtered[ev_filtered[energy_col] > 0].copy()
+        ev_filtered_nonzero["month_label"] = ev_filtered_nonzero["month"].dt.strftime("%b %Y")
+        fig5 = px.box(ev_filtered_nonzero, x="month_label", y=energy_col, points="all")
+        fig5.update_xaxes(title_text="Maand")
+        fig5.update_yaxes(title_text="Energie per sessie (kWh)")
+        st.plotly_chart(fig5, use_container_width=True)
+
+        # --- Data bekijken ---
         with st.expander("📊 Bekijk gebruikte data"):
             st.dataframe(ev_filtered)
 
     except Exception as e:
         st.error(f"Er is een fout opgetreden bij het inlezen van `{file_path}`: {e}")
+
 
 
 # ------------------- Pagina 3 --------------------------
@@ -712,6 +662,7 @@ elif page == "📊 Voorspellend model":
     )
 
     st.plotly_chart(fig, use_container_width=True)
+
 
 
 
