@@ -2,3 +2,15 @@ streamlit
 plotly
 pandas
 numpy
+plotly.express 
+folium
+requests
+re
+st_folium
+MarkerCluster, FastMarkerCluster
+SARIMAX
+matplotlib.pyplot 
+warnings
+pickle
+io
+plotly.graph_objects 
