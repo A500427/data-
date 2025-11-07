@@ -271,25 +271,27 @@ if page == "⚡️ Laadpalen":
 
 # ------------------- Pagina 2 --------------------------
 elif page == "🚘 Voertuigen":
-    st.markdown("## Elektrische Voertuigen & Laadsessies")
+    st.markdown("## Elektrische Voertuigen & laadtijden")
     st.markdown("---")
-
-    # --- Data inladen ---
-    data = pd.read_csv("duitse_automerken_JA.csv")
 
     # --- Functie om brandstoftype te bepalen ---
     def bepaal_type(merk, uitvoering):
         u = str(uitvoering).upper()
         m = str(merk).upper()
+
         elektrische_prefixen = [
             "FA1FA1CZ", "3EER", "3EDF", "3EDE", "2EER", "2EDF", "2EDE",
             "E11", "0AW5", "QE2QE2G1", "QE1QE1G1", "HE1HE1G1", "FA1FA1MD"
         ]
+
         if "BMW I" in m or "PORSCHE" in m or any(u.startswith(pref) for pref in elektrische_prefixen) or "EV" in u:
             return "Elektrisch"
         if "DIESEL" in u or "TDI" in u or "CDI" in u or "DPE" in u or u.startswith("D"):
             return "Diesel"
         return "Benzine"
+
+    # --- Data inladen ---
+    data = pd.read_csv("duitse_automerken_JA.csv")
 
     # --- Merknamen normaliseren ---
     merk_mapping = {
@@ -300,52 +302,64 @@ elif page == "🚘 Voertuigen":
         "FORD-CNG-TECHNIK": "FORD"
     }
     data["Merk"] = data["Merk"].str.upper().replace(merk_mapping)
+
+    # --- Type bepalen ---
     data["Type"] = data.apply(lambda row: bepaal_type(row["Merk"], row["Uitvoering"]), axis=1)
 
     # --- Datumverwerking ---
-    data["Datum eerste toelating"] = data["Datum eerste toelating"].astype(str).str.split(".").str[0]
+    data["Datum eerste toelating"] = (
+        data["Datum eerste toelating"].astype(str).str.split(".").str[0]
+    )
     data["Datum eerste toelating"] = pd.to_datetime(
         data["Datum eerste toelating"], format="%Y%m%d", errors="coerce"
     )
     data = data.dropna(subset=["Datum eerste toelating"])
     data = data[data["Datum eerste toelating"].dt.year > 2010]
+    data["Maand"] = data["Datum eerste toelating"].dt.to_period("M").dt.to_timestamp()
+    data["Maand_str"] = data["Maand"].dt.strftime('%b %Y')  # Maand in letters
 
-    # --- Maandkolom in letters + jaar ---
-    data["MaandJaar"] = data["Datum eerste toelating"].dt.strftime("%b %Y")
-
-    # --- Keuze voor merken ---
+    # --- Keuzemenu voor merken ---
     alle_merknamen = sorted(data["Merk"].unique())
     geselecteerde_merknamen = st.multiselect(
         "*Selecteer automerken om te tonen:*",
         options=alle_merknamen,
         default=[]
     )
+
     if not geselecteerde_merknamen:
         st.warning("⚠️ Geen merken geselecteerd. Alle merken worden getoond!")
         geselecteerde_merknamen = alle_merknamen
+
     data = data[data["Merk"].isin(geselecteerde_merknamen)]
 
-    # --- Aggregatie cumulatief per maand en type ---
-    maand_aantal = data.groupby(["MaandJaar", "Type"]).size().unstack(fill_value=0)
-    cumulatief = maand_aantal.cumsum().reset_index()
+    # --- Aggregatie ---
+    maand_aantal = data.groupby(["Maand_str", "Type"]).size().unstack(fill_value=0)
+    cumulatief = maand_aantal.cumsum()
 
-    # --- Cumulatieve voertuiggrafiek ---
-    st.subheader("Cumulatief aantal voertuigen per maand per brandstofcategorie")
+    # --- 📈 Cumulatieve grafiek ---
+    st.subheader("Cumulatief aantal voertuigen per maand")
+
     fig_cum = go.Figure()
-    for col in cumulatief.columns[1:]:
+    for col in cumulatief.columns:
         fig_cum.add_trace(go.Scatter(
-            x=cumulatief["MaandJaar"],
+            x=cumulatief.index,
             y=cumulatief[col],
             mode="lines+markers",
             name=col
         ))
+
     fig_cum.update_layout(
-        xaxis_title="Maand en jaar",
+        xaxis_title="Maand",
         yaxis_title="Aantal voertuigen (cumulatief)",
         hovermode="x unified",
-        height=600
+        height=600,
+        xaxis=dict(
+            tickangle=-45,  # Labels diagonaal
+            tickmode="auto",
+            nticks=20        # Max aantal ticks tonen
+        )
     )
-    fig_cum.update_xaxes(tickmode="array", tickvals=cumulatief["MaandJaar"], ticktext=cumulatief["MaandJaar"])
+
     st.plotly_chart(fig_cum, use_container_width=True)
 
     # --- EV laaddata (Ann) ---
@@ -650,6 +664,7 @@ elif page == "📊 Voorspellend model":
     )
 
     st.plotly_chart(fig, use_container_width=True)
+
 
 
 
