@@ -315,8 +315,10 @@ elif page == "🚘 Voertuigen":
     )
     data = data.dropna(subset=["Datum eerste toelating"])
     data = data[data["Datum eerste toelating"].dt.year > 2010]
+
+    # Maand als datum + maandnaam-string
     data["Maand"] = data["Datum eerste toelating"].dt.to_period("M").dt.to_timestamp()
-    data["Maand_str"] = data["Maand"].dt.strftime('%b %Y')  # Maand in letters
+    data["Maand_str"] = data["Maand"].dt.strftime('%b %Y')  # Labels
 
     # --- Keuzemenu voor merken ---
     alle_merknamen = sorted(data["Merk"].unique())
@@ -333,7 +335,8 @@ elif page == "🚘 Voertuigen":
     data = data[data["Merk"].isin(geselecteerde_merknamen)]
 
     # --- Aggregatie ---
-    maand_aantal = data.groupby(["Maand_str", "Type"]).size().unstack(fill_value=0)
+    maand_aantal = data.groupby(["Maand", "Type"]).size().unstack(fill_value=0)
+    maand_aantal = maand_aantal.sort_index()  # ✅ Chronologische volgorde
     cumulatief = maand_aantal.cumsum()
 
     # --- 📈 Cumulatieve grafiek ---
@@ -348,16 +351,20 @@ elif page == "🚘 Voertuigen":
             name=col
         ))
 
+    # Labels netjes formatteren (maand + jaar in woorden)
+    fig_cum.update_xaxes(
+        tickangle=-45,
+        tickmode="array",
+        tickvals=cumulatief.index,
+        ticktext=[d.strftime('%b %Y') for d in cumulatief.index],
+        tickfont=dict(size=10)
+    )
+
     fig_cum.update_layout(
         xaxis_title="Maand",
         yaxis_title="Aantal voertuigen (cumulatief)",
         hovermode="x unified",
-        height=600,
-        xaxis=dict(
-            tickangle=-45,  # Labels diagonaal
-            tickmode="auto",
-            nticks=20        # Max aantal ticks tonen
-        )
+        height=600
     )
 
     st.plotly_chart(fig_cum, use_container_width=True)
@@ -664,6 +671,7 @@ elif page == "📊 Voorspellend model":
     )
 
     st.plotly_chart(fig, use_container_width=True)
+
 
 
 
